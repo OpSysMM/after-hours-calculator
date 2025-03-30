@@ -363,5 +363,13 @@ def index():
         debug_info=debug_info
     )
 
+import os
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+# All your route logic here...
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get('PORT', 10000))  # Fallback to 10000 if PORT not set
+    app.run(host='0.0.0.0', port=port)
