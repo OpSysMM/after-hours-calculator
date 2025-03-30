@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HVAC After-Hours Cost Calculator</title>
+
+  <!-- Open Sans Font -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    :root {
+      --brand-primary: #A6CB42;  /* Your primary color */
+      --brand-secondary: #8FC4E2;/* Your secondary color */
+      --brand-bg: #2C3135;       /* Background color */
+    }
+
+    /* Global resets & layout */
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--brand-bg);
+      font-family: 'Open Sans', sans-serif;
+      color: #fff;  /* white text on dark background */
+      line-height: 1.4;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1, h2, h3 {
+      color: var(--brand-primary);
+      margin-bottom: 1rem;
+    }
+    p {
+      margin-bottom: 1rem;
+    }
+
+    .form-panel {
+      background: #f9f9f9; /* light background for form */
+      color: #333;         /* dark text for contrast */
+      border-radius: 5px;
+      padding: 2rem;       /* increased padding */
+      margin-bottom: 2rem;
+    }
+
+    form {
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .form-group label {
+      width: 220px;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      color: #333;
+    }
+    .form-group input[type="text"],
+    .form-group select {
+      width: 260px;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font: inherit;
+    }
+
+    .subheading {
+      margin: 1.5rem 0 0.5rem;
+      color: var(--brand-primary);
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    /* Center the Calculate button; bigger font for emphasis */
+    button[type="submit"] {
+      background: var(--brand-primary);
+      color: #fff;
+      font-weight: 700;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 1rem auto 0;
+      display: block; 
+      font-size: 1rem;
+    }
+    button[type="submit"]:hover {
+      background: #8DAF3B; /* Slightly darker for hover */
+    }
+
+    .results, .debug {
+      margin-top: 2rem;
+      padding: 1.5rem; /* increased padding around results */
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    .results h2 {
+      margin-top: 0;
+    }
+
+    /* Box to highlight the hourly rate per tenant */
+    .rate-box {
+      background: var(--brand-secondary); /* or use brand-primary if you prefer */
+      color: #333;
+      font-size: 1.3rem;
+      font-weight: 700;
+      padding: 0.75rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    /* Debug table styling */
+    .debug table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .debug th,
+    .debug td {
+      border: 1px solid #ccc;
+      padding: 6px;
+    }
+    .debug th {
+      width: 40%;
+      background: #eee;
+    }
+
+    .bold {
+      font-weight: 700;
+    }
+
+    /* Responsive: stack labels & fields for narrow screens */
+    @media (max-width: 600px) {
+      .form-group label {
+        width: 100%;
+      }
+      .form-group input[type="text"],
+      .form-group select {
+        width: 100%;
+        margin-bottom: 0.5rem;
+      }
+    }
+  </style>
+
+  <!-- Simple JavaScript to toggle debug details -->
+  <script>
+    function toggleDebug() {
+      var debugDiv = document.getElementById('debug-details');
+      if (debugDiv.style.display === 'none') {
+        debugDiv.style.display = 'block';
+      } else {
+        debugDiv.style.display = 'none';
+      }
+    }
+  </script>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>HVAC After-Hours Cost Calculator</h1>
+  <p>Enter your building details below to estimate after-hours HVAC costs, factoring in
+     infiltration, occupant latent heat (via presets), and depreciation.</p>
+
+  <!-- Form Panel -->
+  <div class="form-panel">
+    <form method="POST" action="/">
+
+      <!-- Building Information -->
+      <h3 class="subheading">Building Information</h3>
+
+      <!-- City -->
+      <div class="form-group">
+        <label for="city">Building Location (City):</label>
+        <select name="city" id="city">
+          {% for c in [
+              'Chicago','Miami','Dallas','Los Angeles','New York',
+              'Seattle','Phoenix','Atlanta','Denver','Boston','San Francisco'
+          ] %}
+          <option value="{{ c }}" {% if form_data.city == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Building Type -->
+      <div class="form-group">
+        <label for="building_type">Building Type:</label>
+        <select name="building_type" id="building_type">
+          {% for bldg in ['Office','Retail','Warehouse','Data Center'] %}
+          <option value="{{ bldg }}" {% if form_data.building_type == bldg %}selected{% endif %}>
+            {{ bldg }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Net Leasable Area -->
+      <div class="form-group">
+        <label for="area">Net Leasable Area (sq ft):</label>
+        <input type="text" name="area" id="area" 
+               value="{{ form_data.area }}" placeholder="e.g. 50000">
+      </div>
+
+      <!-- Window Area -->
+      <div class="form-group">
+        <label for="window_area">Window Area (%):</label>
+        <input type="text" name="window_area" id="window_area" 
+               value="{{ form_data.window_area }}" placeholder="e.g. 30">
+      </div>
+
+      <!-- Number of Tenancies -->
+      <div class="form-group">
+        <label for="num_tenancies">Number of Tenancies:</label>
+        <input type="text" name="num_tenancies" id="num_tenancies" 
+               value="{{ form_data.num_tenancies }}" placeholder="e.g. 5">
+      </div>
+
+      <!-- Electricity Rate -->
+      <div class="form-group">
+        <label for="electric_rate">Electricity Rate ($/kWh):</label>
+        <input type="text" name="electric_rate" id="electric_rate" 
+               value="{{ form_data.electric_rate }}" placeholder="e.g. 0.12">
+      </div>
+
+      <!-- HVAC System Type -->
+      <div class="form-group">
+        <label for="hvac_system">HVAC System Type:</label>
+        <select name="hvac_system" id="hvac_system">
+          {% for sys in [
+              'Rooftop Unit','Chiller','Heat Pump','VRF System','Geothermal HP','DX Split System'
+          ] %}
+          <option value="{{ sys }}" 
+            {% if form_data.hvac_system == sys %}selected{% endif %}>
+            {{ sys }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Optional COP Override -->
+      <div class="form-group">
+        <label for="hvac_efficiency">HVAC Efficiency (COP) [Optional]:</label>
+        <input type="text" name="hvac_efficiency" id="hvac_efficiency" 
+               value="{{ form_data.hvac_efficiency }}" placeholder="e.g. 3.5">
+      </div>
+
+      <!-- Building Insulation Level -->
+      <div class="form-group">
+        <label for="insulation_level">Building Insulation Level:</label>
+        <select name="insulation_level" id="insulation_level">
+          {% for level in ['Low','Medium','High'] %}
+          <option value="{{ level }}" 
+            {% if form_data.insulation_level == level %}selected{% endif %}>
+            {{ level }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <hr>
+      <!-- Occupancy & Occupant Latent -->
+      <div class="form-group">
+        <label for="occupancy_count">Occupancy Count (After Hours):</label>
+        <input type="text" name="occupancy_count" id="occupancy_count" 
+               value="{{ form_data.occupancy_count }}" placeholder="e.g. 20">
+      </div>
+
+      <div class="form-group">
+        <label for="occupant_latent_preset">Occupant Latent Preset:</label>
+        <select name="occupant_latent_preset" id="occupant_latent_preset">
+          <option value="" {% if not form_data.occupant_latent_preset %}selected{% endif %}>
+            --Select--
+          </option>
+          {% for preset in [
+              'Low Activity (Seated, Quiet)',
+              'Medium Activity (Typical Office/Retail)',
+              'High Activity (Active, Light Exercise)'
+          ] %}
+          <option value="{{ preset }}" 
+            {% if form_data.occupant_latent_preset == preset %}selected{% endif %}>
+            {{ preset }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <hr>
+      <!-- Infiltration -->
+      <h3 class="subheading">Infiltration Options</h3>
+      <div class="form-group">
+        <label for="infiltration_preset">Infiltration Preset:</label>
+        <select name="infiltration_preset" id="infiltration_preset">
+          <option value="" {% if not form_data.infiltration_preset %}selected{% endif %}>
+            --Select--
+          </option>
+          {% for preset in [
+              'Low (Tight Building)',
+              'Medium',
+              'High (Leaky Building)'
+          ] %}
+          <option value="{{ preset }}" 
+            {% if form_data.infiltration_preset == preset %}selected{% endif %}>
+            {{ preset }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="infiltration_cfm">Custom Infiltration (CFM):</label>
+        <input type="text" name="infiltration_cfm" id="infiltration_cfm" 
+               value="{{ form_data.infiltration_cfm }}" placeholder="Override (CFM)">
+        <p style="font-size:0.9em; color:#666; margin:0.2rem 0 0.8rem 220px;">
+          Enter a positive number to override the chosen preset above.
+          (Presets are CFM/ft² &times; Area)
+        </p>
+      </div>
+
+      <hr>
+      <!-- Capital & Depreciation -->
+      <h3 class="subheading">Capital & Depreciation</h3>
+      <div class="form-group">
+        <label for="hvac_capital_cost">HVAC Capital Cost ($):</label>
+        <input type="text" name="hvac_capital_cost" id="hvac_capital_cost" 
+               value="{{ form_data.hvac_capital_cost }}" placeholder="e.g. 200000">
+      </div>
+
+      <div class="form-group">
+        <label for="hvac_lifespan_years">HVAC Lifespan (years):</label>
+        <input type="text" name="hvac_lifespan_years" id="hvac_lifespan_years" 
+               value="{{ form_data.hvac_lifespan_years }}" placeholder="e.g. 15">
+      </div>
+
+      <div class="form-group">
+        <label for="annual_operating_hours">Annual Operating Hours:</label>
+        <input type="text" name="annual_operating_hours" id="annual_operating_hours" 
+               value="{{ form_data.annual_operating_hours }}" placeholder="e.g. 2500">
+      </div>
+
+      <button type="submit">Calculate</button>
+    </form>
+  </div>
+  <!-- end form-panel -->
+
+  {% if cost_per_hour is not none and cost_per_tenant is not none %}
+  <div class="results">
+    <h2>After-Hours Cost Results</h2>
+
+    <p><span class="bold">Total HVAC Cost per Hour (Entire Building):</span>
+       ${{ "%0.2f"|format(cost_per_hour) }}</p>
+
+    <!-- The highlighted box for Hourly Rate per Tenant -->
+    <div class="rate-box">
+      Hourly Rate per Tenant (After Hours):
+      ${{ "%0.2f"|format(cost_per_tenant) }}
+    </div>
+
+    <p style="margin-top:0.5rem;">
+      You can charge <strong>${{ "%0.2f"|format(cost_per_tenant) }}</strong>
+      per tenant for after-hours HVAC usage.
+    </p>
+  </div>
+  {% endif %}
+
+  {% if debug_info %}
+  <!-- Collapsible Debug Section -->
+  <div class="results debug">
+    <button type="button" onclick="toggleDebug()" style="
+      background: var(--brand-primary);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    ">
+      Show/Hide Calculation Details
+    </button>
+
+    <div id="debug-details" style="display:none;">
+      <h3>Calculation Details</h3>
+      <table>
+        {% for key, val in debug_info.items() %}
+        <tr>
+          <th>{{ key }}</th>
+          <td>{{ val }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div> <!-- end container -->
+
+</body>
+</html>
